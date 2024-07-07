@@ -1,0 +1,9 @@
+.idea
+data/super_resolution/train/*
+data/super_resolution/val/*
+data/super_resolution/test/*
+data/super_resolution/train2/*
+data/super_resolution/val2/*
+!data/super_resolution/train/train.txt
+!data/super_resolution/val/val.txt
+!data/super_resolution/test/test.txt
