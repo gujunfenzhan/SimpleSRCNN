@@ -1,7 +1,7 @@
 # 简单超分辨率模型
-___
+
 ## 流程
-___
+
 ```mermaid
 graph TD
     A[数据集]
@@ -18,7 +18,7 @@ graph TD
     B-->A
 ```
 ## 文件结构
-___
+
 + data 数据集
   + super_resolution 数据集名字
     + train 训练集
@@ -26,7 +26,7 @@ ___
     + test 测试集
 + model 网络模型
 ## 训练
-___
+
 ```bash
 python train.py
 --dataset       数据集
@@ -46,7 +46,7 @@ python train.py
 --padding       卷积核扩充大小,仅SRCNN模型生效
 ```
 ## 测试
-___
+
 ```bash
 python test.py
 ```
