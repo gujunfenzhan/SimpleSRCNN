@@ -23,7 +23,7 @@ parser.add_argument('--patch_size', default=64, type=int, help="Width and height
 parser.add_argument('--patch_stride', default=28, type=int, help="Stride for extracting patches")
 parser.add_argument('--num_epochs', default=50, type=int, help="Number of training epochs")
 parser.add_argument('--num_res_blk', default=16, type=int, help="Number of residual blocks in the model")
-parser.add_argument('--kernel_size', default=5, type=int, help="Size of convolution kernels")
+parser.add_argument('--kernel_size', default=3, type=int, help="Size of convolution kernels")
 parser.add_argument('--minimum_scale', default=0.2, type=float, help="Minimum scale factor for image definition")
 parser.add_argument('--maximum_scale', default=0.4, type=float, help="Maximum scale factor for image definition")
 parser.add_argument('--num_image', default=-1, type=int, help="Number of images to use for training, -1 for all")
@@ -32,7 +32,9 @@ parser.add_argument('--num_sample', default=64, type=int, help="Number of images
 parser.add_argument('--batch_size', default=256, type=int, help="Batch size for training patches extracted from "
                                                                 "sampled images")
 parser.add_argument('--no_bp_train', action='store_true', default=False, help='Disable breakpoint training')
-parser.add_argument('--padding', default=2, type=int, help="Padding size for convolution layers")
+parser.add_argument('--padding', default=1, type=int, help="Padding size for convolution layers")
+parser.add_argument('--backup', action='store_true', default=False)
+
 args = parser.parse_args()
 # 遍历并输出所有参数及其值
 for arg, value in args.__dict__.items():
@@ -68,53 +70,59 @@ val_dataset = SRCNNDataset(list(val_path.glob("*.png")), args.minimum_scale, arg
                            args.patch_stride)
 train_dataloader = SRCNNDataLoader(train_dataset, batch_size=args.num_sample, shuffle=True, num_workers=0)
 val_dataloader = SRCNNDataLoader(val_dataset, batch_size=args.num_sample, shuffle=True, num_workers=0)
-
-for epoch in range(args.num_epochs):
-    print("第%s轮训练" % (epoch + 1))
-    outer_tq = tqdm(train_dataloader, desc="训练集")
-    outer_total_loss = 0
-    for sample_group in outer_tq:
-        inner_tq = tqdm(range(0, len(sample_group), args.batch_size), leave=False, desc="训练集")
-        total_loss = 0
-        for batch_idx in inner_tq:
-            x, y = zip(*sample_group[batch_idx:batch_idx + args.batch_size])
-            x = torch.stack(x).to(device)
-            y = torch.stack(y).to(device)
-            y_predict = model(x)
-            loss = criterion(y_predict, y)
-            optimizer.zero_grad()
-            loss.backward()
-            optimizer.step()
-            inner_tq.set_postfix(loss=loss.item())
-            total_loss += loss.item()
-        average_loss = total_loss / len(inner_tq)
-        outer_total_loss += average_loss
-        outer_tq.set_postfix(loss=average_loss)
-        inner_tq.close()
-    outer_tq.close()
-    train_outer_average_loss = outer_total_loss / len(outer_tq)
-
-    outer_tq = tqdm(val_dataloader, desc="测试集")
-    outer_total_loss = 0
-    for sample_group in outer_tq:
-        inner_tq = tqdm(range(0, len(sample_group), args.batch_size), leave=False, desc="测试集")
-        total_loss = 0
-        for batch_idx in inner_tq:
-            with torch.no_grad():
+try:
+    for epoch in range(args.num_epochs):
+        print("第%s轮训练" % (epoch + 1))
+        outer_tq = tqdm(train_dataloader, desc="训练集")
+        outer_total_loss = 0
+        for sample_group in outer_tq:
+            inner_tq = tqdm(range(0, len(sample_group), args.batch_size), leave=False, desc="训练集")
+            total_loss = 0
+            for batch_idx in inner_tq:
                 x, y = zip(*sample_group[batch_idx:batch_idx + args.batch_size])
                 x = torch.stack(x).to(device)
                 y = torch.stack(y).to(device)
                 y_predict = model(x)
                 loss = criterion(y_predict, y)
+                optimizer.zero_grad()
+                loss.backward()
+                optimizer.step()
                 inner_tq.set_postfix(loss=loss.item())
                 total_loss += loss.item()
-        average_loss = total_loss / len(inner_tq)
-        outer_total_loss += average_loss
-        outer_tq.set_postfix(loss=average_loss)
-        inner_tq.close()
-    outer_tq.close()
-    val_outer_average_loss = outer_total_loss / len(outer_tq)
-    print("训练集平均loss:%s\t测试集平均loss:%s" % (train_outer_average_loss, val_outer_average_loss))
-    if val_outer_average_loss <= best_loss:
-        best_loss = val_outer_average_loss
-        torch.save(model, "model/model%s.pth" % val_outer_average_loss)
+            average_loss = total_loss / len(inner_tq)
+            outer_total_loss += average_loss
+            outer_tq.set_postfix(loss=average_loss)
+            inner_tq.close()
+            if args.backup:
+                torch.save(model, "backup/model-backup-%s-%s.pth" % ((epoch+1),time.strftime("%Y-%m-%d-%H-%M-%S")))
+        outer_tq.close()
+        train_outer_average_loss = outer_total_loss / len(outer_tq)
+
+        outer_tq = tqdm(val_dataloader, desc="测试集")
+        outer_total_loss = 0
+        for sample_group in outer_tq:
+            inner_tq = tqdm(range(0, len(sample_group), args.batch_size), leave=False, desc="测试集")
+            total_loss = 0
+            for batch_idx in inner_tq:
+                with torch.no_grad():
+                    x, y = zip(*sample_group[batch_idx:batch_idx + args.batch_size])
+                    x = torch.stack(x).to(device)
+                    y = torch.stack(y).to(device)
+                    y_predict = model(x)
+                    loss = criterion(y_predict, y)
+                    inner_tq.set_postfix(loss=loss.item())
+                    total_loss += loss.item()
+            average_loss = total_loss / len(inner_tq)
+            outer_total_loss += average_loss
+            outer_tq.set_postfix(loss=average_loss)
+            inner_tq.close()
+        outer_tq.close()
+        val_outer_average_loss = outer_total_loss / len(outer_tq)
+        print("训练集平均loss:%s\t测试集平均loss:%s" % (train_outer_average_loss, val_outer_average_loss))
+        if val_outer_average_loss <= best_loss:
+            best_loss = val_outer_average_loss
+            torch.save(model, "model/model%s.pth" % val_outer_average_loss)
+except KeyboardInterrupt as e:
+    name = input("模型名字:")
+    torch.save(model, "model/%s" % name)
+    print("保存成功")

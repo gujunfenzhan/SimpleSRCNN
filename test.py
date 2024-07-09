@@ -3,7 +3,7 @@ import torch
 from PIL import Image
 from torchvision import transforms
 
-from model import SRCNN
+from model import ResNetCNN
 from pylab import mpl
 
 # 设置中文显示字体
@@ -12,9 +12,9 @@ mpl.rcParams["font.sans-serif"] = ["SimHei"]
 device = torch.device("cuda") if torch.cuda.is_available() else torch.device('cpu')
 transform_to_tensor = transforms.ToTensor()
 transform_to_pil = transforms.ToPILImage(mode="YCbCr")
-image_path = "image/illust_83516948_20230611_230308.jpg"
+image_path = "image/17198480244418ee6b129d746fc66cdaea5eefb03aef69efb.jpg"
 test_image = Image.open(image_path).convert("YCbCr")
-model = torch.load('model/model0.0005458736550891897.pth')
+model = torch.load('model/model0.00028338011013315.pth')
 y, cb, cr = transform_to_tensor(test_image).to(device)
 y = y.unsqueeze(0)
 with torch.no_grad():
